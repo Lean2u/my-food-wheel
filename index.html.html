@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高级版·今天吃什么转盘</title>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --bg-color: #f0f2f5;
+        }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 左侧管理栏 */
+        .sidebar {
+            width: 350px;
+            background: white;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        h2 { color: #333; margin-top: 0; }
+
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        input[type="text"]:focus { border-color: var(--primary-color); }
+
+        .add-btn {
+            padding: 10px 15px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        /* 食物列表区 */
+        #foodList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .food-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #f9f9f9;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            gap: 10px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn { from {opacity: 0; transform: translateY(5px);} to {opacity: 1; transform: translateY(0);} }
+
+        .food-name { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        input[type="color"] {
+            border: none;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            background: none;
+        }
+
+        .del-btn {
+            background: #ff4d4f;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* 右侧展示区 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 450px;
+            height: 450px;
+        }
+
+        #wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            /* 升级版回弹效果：cubic-bezier(0.2, 0, 0, 1.15) */
+            transition: transform 4s cubic-bezier(0.2, 0, 0, 1.15);
+            border: 8px solid white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #333;
+            z-index: 20;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+
+        .spin-btn {
+            margin-top: 40px;
+            padding: 15px 60px;
+            font-size: 20px;
+            background: #ff9800;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255,152,0,0.4);
+            transition: all 0.2s;
+        }
+
+        .spin-btn:active { transform: scale(0.95); }
+        .spin-btn:disabled { background: #ccc; box-shadow: none; cursor: not-allowed; }
+
+        #resultDisplay {
+            margin-top: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            height: 40px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>菜单管理</h2>
+        <div class="input-group">
+            <input type="text" id="foodInput" placeholder="输入食物名称..." onkeypress="handleEnter(event)">
+            <button class="add-btn" onclick="addFood()">添加</button>
+        </div>
+        <ul id="foodList"></ul>
+    </div>
+
+    <div class="main-content">
+        <div id="resultDisplay">今天吃什么？</div>
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <canvas id="wheel" width="500" height="500"></canvas>
+        </div>
+        <button id="spinBtn" class="spin-btn" onclick="spinWheel()">点击旋转</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const foodInput = document.getElementById('foodInput');
+        const foodListUl = document.getElementById('foodList');
+        const spinBtn = document.getElementById('spinBtn');
+        const resultDisplay = document.getElementById('resultDisplay');
+
+        // 初始数据结构：对象数组，包含名称和颜色
+        let items = [
+            { name: "拉面", color: "#FFC107" },
+            { name: "汉堡", color: "#2196F3" },
+            { name: "火锅", color: "#F44336" },
+            { name: "麻辣烫", color: "#9C27B0" },
+            { name: "萨莉亚", color: "#4CAF50" }
+        ];
+
+        let currentRotation = 0;
+        let isSpinning = false;
+
+        // 随机颜色生成器
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        // 渲染左侧列表
+        function renderList() {
+            foodListUl.innerHTML = '';
+            items.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'food-item';
+                li.innerHTML = `
+                    <input type="color" value="${item.color}" onchange="updateColor(${index}, this.value)">
+                    <span class="food-name">${item.name}</span>
+                    <button class="del-btn" onclick="deleteItem(${index})">删除</button>
+                `;
+                foodListUl.appendChild(li);
+            });
+            drawWheel();
+        }
+
+        // 绘制转盘
+        function drawWheel() {
+            const size = canvas.width;
+            const center = size / 2;
+            ctx.clearRect(0, 0, size, size);
+
+            if (items.length === 0) {
+                ctx.fillStyle = "#ddd";
+                ctx.beginPath();
+                ctx.arc(center, center, center, 0, Math.PI * 2);
+                ctx.fill();
+                return;
+            }
+
+            const arc = (Math.PI * 2) / items.length;
+
+            items.forEach((item, i) => {
+                const angle = i * arc - Math.PI / 2;
+                
+                // 画扇形
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.arc(center, center, center, angle, angle + arc);
+                ctx.fillStyle = item.color;
+                ctx.fill();
+                ctx.strokeStyle = "rgba(255,255,255,0.5)";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 画文字
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(angle + arc / 2);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "white";
+                ctx.font = "bold 20px sans-serif";
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = "rgba(0,0,0,0.3)";
+                ctx.fillText(item.name, center - 20, 10);
+                ctx.restore();
+            });
+        }
+
+        // 交互功能
+        function addFood() {
+            const name = foodInput.value.trim();
+            if (name) {
+                items.push({ name: name, color: getRandomColor() });
+                foodInput.value = '';
+                renderList();
+            }
+        }
+
+        function deleteItem(index) {
+            items.splice(index, 1);
+            renderList();
+        }
+
+        function updateColor(index, color) {
+            items[index].color = color;
+            drawWheel();
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') addFood();
+        }
+
+        function spinWheel() {
+            if (items.length < 2) return alert("至少需要两个选项才能转动哦！");
+            if (isSpinning) return;
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            resultDisplay.innerText = "正在挑选...";
+
+            const rotation = 360 * 5 + Math.floor(Math.random() * 360);
+            currentRotation += rotation;
+            
+            canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+            setTimeout(() => {
+                isSpinning = false;
+                spinBtn.disabled = false;
+
+                // 计算结果
+                const actualDeg = currentRotation % 360;
+                let winningAngle = 360 - actualDeg;
+                if (winningAngle === 360) winningAngle = 0;
+                
+                const sliceSize = 360 / items.length;
+                const index = Math.floor(winningAngle / sliceSize);
+                
+                resultDisplay.innerText = `🎉 今天就吃：${items[index].name}！`;
+            }, 4000);
+        }
+
+        // 初始化
+        renderList();
+    </script>
+</body>
+</html>
+
+<div style="margin-top: 20px; display: flex; gap: 5px;">
+    <button onclick="exportData()" style="flex: 1; padding: 8px; font-size: 12px; cursor: pointer;">导出到桌面</button>
+    <button onclick="document.getElementById('fileInput').click()" style="flex: 1; padding: 8px; font-size: 12px; cursor: pointer;">从桌面导入</button>
+    <input type="file" id="fileInput" style="display: none;" onchange="importData(event)">
+</div>
+
+<script>
+    // 在 <script> 标签内添加这两个新函数
+
+    // 导出功能：把当前的食物列表变成一个文件下载到桌面
+    function exportData() {
+        const dataStr = JSON.stringify(items, null, 2);
+        const blob = new Blob([dataStr], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = "我的转盘菜单.json"; // 导出的文件名
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // 导入功能：读取桌面上的文件并更新转盘
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedItems = JSON.parse(e.target.result);
+                if (Array.isArray(importedItems)) {
+                    items = importedItems;
+                    renderList();
+                    alert("导入成功！");
+                }
+            } catch (err) {
+                alert("文件格式不对哦，请确保是导出的 .json 文件。");
+            }
+        };
+        reader.readAsText(file);
+    }
+</script>
