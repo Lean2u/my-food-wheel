@@ -192,14 +192,17 @@
         const spinBtn = document.getElementById('spinBtn');
         const resultDisplay = document.getElementById('resultDisplay');
 
-        // 初始数据结构：对象数组，包含名称和颜色
-        let items = [
-            { name: "拉面", color: "#FFC107" },
-            { name: "汉堡", color: "#2196F3" },
-            { name: "火锅", color: "#F44336" },
-            { name: "麻辣烫", color: "#9C27B0" },
-            { name: "萨莉亚", color: "#4CAF50" }
-        ];
+        // 先尝试从本地存储读取数据
+const savedData = localStorage.getItem('myFoodWheelData');
+
+// 如果有数据就用数据，没有就用默认的
+let items = savedData ? JSON.parse(savedData) : [
+    { name: "拉面", color: "#FFC107" },
+    { name: "汉堡", color: "#2196F3" },
+    { name: "火锅", color: "#F44336" },
+    { name: "麻辣烫", color: "#9C27B0" },
+    { name: "萨莉亚", color: "#4CAF50" }
+];
 
         let currentRotation = 0;
         let isSpinning = false;
@@ -228,6 +231,9 @@
                 foodListUl.appendChild(li);
             });
             drawWheel();
+            // 就是加这一行！把它锁进本地存储
+    localStorage.setItem('myFoodWheelData', JSON.stringify(items));
+}
         }
 
         // 绘制转盘
@@ -374,3 +380,4 @@
     }
 
 </script>
+
