@@ -19,7 +19,6 @@
             overflow: hidden;
         }
 
-        /* 左侧管理栏 */
         .sidebar {
             width: 350px;
             background: white;
@@ -57,7 +56,6 @@
             cursor: pointer;
         }
 
-        /* 食物列表区 */
         #foodList {
             list-style: none;
             padding: 0;
@@ -99,7 +97,6 @@
             font-size: 12px;
         }
 
-        /* 右侧展示区 */
         .main-content {
             flex: 1;
             display: flex;
@@ -154,8 +151,9 @@
         .spin-btn:active { transform: scale(0.95); }
         .spin-btn:disabled { background: #ccc; box-shadow: none; cursor: not-allowed; }
 
+        /* 调整标题位置：通过 margin-bottom 撑开与转盘的距离 */
         #resultDisplay {
-            margin-top: 20px;
+            margin-bottom: 50px; 
             font-size: 28px;
             font-weight: bold;
             color: #333;
@@ -172,11 +170,6 @@
             <button class="add-btn" onclick="addFood()">添加</button>
         </div>
         <ul id="foodList"></ul>
-        <div style="margin-top: 20px; display: flex; gap: 5px;">
-            <button onclick="exportData()" style="flex: 1; padding: 8px; font-size: 12px; cursor: pointer;">导出到桌面</button>
-            <button onclick="document.getElementById('fileInput').click()" style="flex: 1; padding: 8px; font-size: 12px; cursor: pointer;">从桌面导入</button>
-            <input type="file" id="fileInput" style="display: none;" onchange="importData(event)">
-        </div>
     </div>
 
     <div class="main-content">
@@ -196,7 +189,7 @@
         const spinBtn = document.getElementById('spinBtn');
         const resultDisplay = document.getElementById('resultDisplay');
 
-        // 1. 加载数据：先看记忆，没记忆用默认
+        // 初始化：读取记忆或使用默认
         const savedData = localStorage.getItem('myFoodWheelData');
         let items = savedData ? JSON.parse(savedData) : [
             { name: "拉面", color: "#FFC107" },
@@ -218,7 +211,6 @@
             return color;
         }
 
-        // 2. 渲染函数：这里我修好了括号！
         function renderList() {
             foodListUl.innerHTML = '';
             items.forEach((item, index) => {
@@ -232,7 +224,7 @@
                 foodListUl.appendChild(li);
             });
             drawWheel();
-            // 自动保存到本地
+            // 实时保存记忆
             localStorage.setItem('myFoodWheelData', JSON.stringify(items));
         }
 
@@ -291,7 +283,7 @@
 
         function updateColor(index, color) {
             items[index].color = color;
-            renderList(); // 这里改成 renderList 确保颜色更改也被保存
+            renderList();
         }
 
         function handleEnter(e) {
@@ -322,38 +314,7 @@
             }, 4000);
         }
 
-        // 导入导出功能
-        function exportData() {
-            const dataStr = JSON.stringify(items, null, 2);
-            const blob = new Blob([dataStr], {type: "application/json"});
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = "我的转盘菜单.json";
-            link.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function importData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const importedItems = JSON.parse(e.target.result);
-                    if (Array.isArray(importedItems)) {
-                        items = importedItems;
-                        renderList();
-                        alert("导入成功！");
-                    }
-                } catch (err) {
-                    alert("文件格式不对哦！");
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        // 启动！
+        // 初始化启动
         renderList();
     </script>
 </body>
